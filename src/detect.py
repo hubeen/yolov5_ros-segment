@@ -23,16 +23,32 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative path
 
 # import from yolov5 submodules
+from utils.augmentations import letterbox
 from models.common import DetectMultiBackend
+from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from utils.general import (
     check_img_size,
     check_requirements,
     non_max_suppression,
-    scale_coords
+    scale_coords,
+    LOGGER, 
+    Profile, 
+    check_file, 
+    check_img_size, 
+    check_imshow, 
+    check_requirements, 
+    colorstr, 
+    cv2,
+    increment_path, 
+    non_max_suppression, 
+    print_args, 
+    scale_boxes, 
+    scale_segments,
+    strip_optimizer
 )
-from utils.plots import Annotator, colors
-from utils.torch_utils import select_device
-from utils.augmentations import letterbox
+from utils.plots import Annotator, colors, save_one_box
+from utils.segment.general import masks2segments, process_mask, process_mask_native
+from utils.torch_utils import select_device, smart_inference_mode
 
 
 @torch.no_grad()
@@ -109,7 +125,7 @@ class Yolov5Detector:
         else:
             im = self.bridge.imgmsg_to_cv2(data, desired_encoding="bgr8")
         
-        im, im0 = self.preprocess(im)
+        im, im0 = self.preprocess(im) 
         # print(im.shape)
         # print(img0.shape)
         # print(img.shape)
@@ -121,9 +137,10 @@ class Yolov5Detector:
         if len(im.shape) == 3:
             im = im[None]
 
-        pred = self.model(im, augment=False, visualize=False)
+        pred_og = self.model(im, augment=False, visualize=False)
+        proto = pred_og[1]
         pred = non_max_suppression(
-            pred, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
+            pred_og, self.conf_thres, self.iou_thres, self.classes, self.agnostic_nms, max_det=self.max_det
         )
 
         ### To-do move pred to CPU and fill BoundingBox messages
@@ -187,7 +204,7 @@ class Yolov5Detector:
         img = img[..., ::-1].transpose((0, 3, 1, 2))  # BGR to RGB, BHWC to BCHW
         img = np.ascontiguousarray(img)
 
-        return img, img0 
+        return img, img0, None, ''
 
 
 if __name__ == "__main__":
